@@ -1,0 +1,149 @@
+diff --git a/sphinx/builders/html.py b/sphinx/builders/html.py
+index 8b63352..1a95c77 100644
+--- a/sphinx/builders/html.py
++++ b/sphinx/builders/html.py
+@@ -14,7 +14,6 @@ import posixpath
+ import re
+ import sys
+ import warnings
+-from hashlib import md5
+ from os import path
+ 
+ import docutils
+@@ -40,7 +39,7 @@ from sphinx.highlighting import PygmentsBridge
+ from sphinx.locale import _, __, l_
+ from sphinx.search import js_index
+ from sphinx.theming import HTMLThemeFactory
+-from sphinx.util import jsonimpl, logging, status_iterator
++from sphinx.util import jsonimpl, logging, status_iterator, md5
+ from sphinx.util.console import bold, darkgreen  # type: ignore
+ from sphinx.util.docutils import is_html5_writer_available, new_document
+ from sphinx.util.fileutil import copy_asset
+diff --git a/sphinx/ext/graphviz.py b/sphinx/ext/graphviz.py
+index 08707b7..9d53a0e 100644
+--- a/sphinx/ext/graphviz.py
++++ b/sphinx/ext/graphviz.py
+@@ -13,7 +13,6 @@
+ import codecs
+ import posixpath
+ import re
+-from hashlib import sha1
+ from os import path
+ from subprocess import Popen, PIPE
+ 
+@@ -25,7 +24,7 @@ from six import text_type
+ import sphinx
+ from sphinx.errors import SphinxError
+ from sphinx.locale import _, __
+-from sphinx.util import logging
++from sphinx.util import logging, sha1
+ from sphinx.util.i18n import search_image_for_language
+ from sphinx.util.osutil import ensuredir, ENOENT, EPIPE, EINVAL
+ 
+diff --git a/sphinx/ext/imgmath.py b/sphinx/ext/imgmath.py
+index 5f9d7a1..23f89ed 100644
+--- a/sphinx/ext/imgmath.py
++++ b/sphinx/ext/imgmath.py
+@@ -14,7 +14,6 @@ import posixpath
+ import re
+ import shutil
+ import tempfile
+-from hashlib import sha1
+ from os import path
+ from subprocess import Popen, PIPE
+ 
+@@ -26,7 +25,7 @@ from sphinx.errors import SphinxError, ExtensionError
+ from sphinx.ext.mathbase import get_node_equation_number
+ from sphinx.ext.mathbase import setup_math as mathbase_setup, wrap_displaymath
+ from sphinx.locale import _
+-from sphinx.util import logging
++from sphinx.util import logging, sha1
+ from sphinx.util.osutil import ensuredir, ENOENT, cd
+ from sphinx.util.png import read_png_depth, write_png_depth
+ from sphinx.util.pycompat import sys_encoding
+diff --git a/sphinx/ext/inheritance_diagram.py b/sphinx/ext/inheritance_diagram.py
+index 14593ac..9576d07 100644
+--- a/sphinx/ext/inheritance_diagram.py
++++ b/sphinx/ext/inheritance_diagram.py
+@@ -39,7 +39,6 @@ r"""
+ import inspect
+ import re
+ import sys
+-from hashlib import md5
+ 
+ from docutils import nodes
+ from docutils.parsers.rst import Directive, directives
+@@ -50,7 +49,7 @@ import sphinx
+ from sphinx.ext.graphviz import render_dot_html, render_dot_latex, \
+     render_dot_texinfo, figure_wrapper
+ from sphinx.pycode import ModuleAnalyzer
+-from sphinx.util import force_decode
++from sphinx.util import force_decode, md5
+ 
+ if False:
+     # For type annotation
+diff --git a/sphinx/transforms/post_transforms/images.py b/sphinx/transforms/post_transforms/images.py
+index 6dd135e..d1c50bd 100644
+--- a/sphinx/transforms/post_transforms/images.py
++++ b/sphinx/transforms/post_transforms/images.py
+@@ -10,14 +10,13 @@
+ """
+ 
+ import os
+-from hashlib import sha1
+ from math import ceil
+ 
+ from docutils import nodes
+ from six import text_type
+ 
+ from sphinx.transforms import SphinxTransform
+-from sphinx.util import epoch_to_rfc1123, rfc1123_to_epoch
++from sphinx.util import epoch_to_rfc1123, rfc1123_to_epoch, sha1
+ from sphinx.util import logging, requests
+ from sphinx.util.images import guess_mimetype, get_image_extension, parse_data_uri
+ from sphinx.util.osutil import ensuredir, movefile
+diff --git a/sphinx/util/__init__.py b/sphinx/util/__init__.py
+index dda3fb0..9c1c441 100644
+--- a/sphinx/util/__init__.py
++++ b/sphinx/util/__init__.py
+@@ -11,6 +11,7 @@
+ from __future__ import absolute_import
+ 
+ import fnmatch
++import hashlib
+ import os
+ import posixpath
+ import re
+@@ -164,6 +165,32 @@ class FilenameUniqDict(dict):
+         # type: (Set[unicode]) -> None
+         self._existing = state
+ 
++def md5(data=b'', **kwargs):
++    """Wrapper around hashlib.md5
++    Attempt call with 'usedforsecurity=False' if we get a ValueError, which happens when
++    OpenSSL FIPS mode is enabled:
++    ValueError: error:060800A3:digital envelope routines:EVP_DigestInit_ex:disabled for fips
++    See: https://github.com/sphinx-doc/sphinx/issues/7611
++    """
++
++    try:
++        return hashlib.md5(data, **kwargs)  # type: ignore
++    except ValueError:
++        return hashlib.md5(data, **kwargs, usedforsecurity=False)  # type: ignore
++
++
++def sha1(data=b'', **kwargs):
++    """Wrapper around hashlib.sha1
++    Attempt call with 'usedforsecurity=False' if we get a ValueError
++    See: https://github.com/sphinx-doc/sphinx/issues/7611
++    """
++
++    try:
++        return hashlib.sha1(data, **kwargs)  # type: ignore
++    except ValueError:
++        return hashlib.sha1(data, **kwargs, usedforsecurity=False)  # type: ignore
++
++
+ 
+ def copy_static_entry(source, targetdir, builder, context={},
+                       exclude_matchers=(), level=0):
